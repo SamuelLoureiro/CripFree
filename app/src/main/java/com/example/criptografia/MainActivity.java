@@ -1,9 +1,16 @@
 package com.example.criptografia;
+import android.Manifest;
+import android.bluetooth.BluetoothAdapter;
+import android.bluetooth.BluetoothDevice;
+import android.bluetooth.BluetoothManager;
+import android.content.DialogInterface;
 import android.os.Bundle;
 import android.widget.Button;
 import android.widget.Toast;
 
 import androidx.annotation.NonNull;
+import androidx.annotation.RequiresPermission;
+import androidx.appcompat.app.AlertDialog;
 import androidx.biometric.BiometricManager;
 import androidx.biometric.BiometricPrompt;
 import androidx.core.content.ContextCompat;
@@ -14,6 +21,9 @@ import androidx.core.graphics.Insets;
 import androidx.core.view.ViewCompat;
 import androidx.core.view.WindowInsetsCompat;
 
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Set;
 import java.util.concurrent.Executor;
 
 public class MainActivity extends AppCompatActivity {
@@ -55,6 +65,7 @@ public class MainActivity extends AppCompatActivity {
                 }
             }
 
+            @RequiresPermission(Manifest.permission.BLUETOOTH_CONNECT)
             public void onAuthenticationSucceeded(@NonNull BiometricPrompt.AuthenticationResult result){
                 super.onAuthenticationSucceeded(result);
 
@@ -65,7 +76,7 @@ public class MainActivity extends AppCompatActivity {
                 }else {
                     Toast.makeText(getApplicationContext(), "Empreinte digitale vérifiée", Toast.LENGTH_SHORT).show();
                 }
-                //notifyAcess();
+                notifyAccess();
             }
 
             @Override
@@ -93,7 +104,55 @@ public class MainActivity extends AppCompatActivity {
             return insets;
         });
     }
+    @RequiresPermission(Manifest.permission.BLUETOOTH_CONNECT)
     private void notifyAccess(){
+        BluetoothManager manager = getSystemService(BluetoothManager.class);
+        BluetoothAdapter adapter = manager.getAdapter();
+        GerenciadorBluetooth controller = new GerenciadorBluetooth();
+
+        if(adapter==null){
+            Toast.makeText(getApplicationContext(),"Adapter is null",Toast.LENGTH_LONG).show();
+        }else if(!adapter.isEnabled()){
+            Toast.makeText(getApplicationContext(),"Turn on your bluetooth",Toast.LENGTH_SHORT).show();
+
+        }else{
+           Set<BluetoothDevice> listaDispositivo = adapter.getBondedDevices();
+
+           if(listaDispositivo.isEmpty()){
+               Toast.makeText(getApplicationContext(),"Pair with your PC first",Toast.LENGTH_SHORT).show();
+           }else if(listaDispositivo.size()==1){
+               BluetoothDevice dispositive = listaDispositivo.iterator().next();
+               Toast.makeText(getApplicationContext(),"Sending command to PC",Toast.LENGTH_SHORT).show();
+               controller.connectNSend(dispositive,adapter,"DESBLOQUEAR");
+           }else{
+               List<BluetoothDevice> bluetoothDeviceList = new ArrayList<>(listaDispositivo);
+               String[] listName = new String[bluetoothDeviceList.size()];
+               for(int i=0;i<listaDispositivo.size();i++){
+                    String name = bluetoothDeviceList.get(i).getName();
+                    listName[i]= (name!=null)? name : bluetoothDeviceList.get(i).getAddress();
+               }
+               AlertDialog.Builder builder = new AlertDialog.Builder(this);
+               builder.setTitle("Selecting PC");
+
+               builder.setItems(listName, new DialogInterface.OnClickListener() {
+                   @Override
+                   public void onClick(DialogInterface dialog, int position) {
+
+                       BluetoothDevice dispositivoEscolhido = bluetoothDeviceList.get(position);
+
+                       Toast.makeText(MainActivity.this, "Conecting...", Toast.LENGTH_SHORT).show();
+
+                       GerenciadorBluetooth meuGerenciador = new GerenciadorBluetooth();
+
+                       meuGerenciador.connectNSend(dispositivoEscolhido, adapter, "DESBLOQUEAR");
+                   }
+               });
+
+               AlertDialog popUp = builder.create();
+               popUp.show();
+           }
+
+        }
 
     }
 }
